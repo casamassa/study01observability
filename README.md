@@ -1,6 +1,8 @@
 # study01observability
 
-Subir os containers:
+Para executar:
+
+1 - Subir os containers:
 
 Prometheus:
 
@@ -18,9 +20,20 @@ Grafana:
 
 docker run -d --name grafana -p 3000:3000 grafana/grafana
 
+cAdvisor:
+(Para monitorar o "hardware" dos seus containers (CPU, Memória, Rede) e integrar isso ao seu dashboard de métricas, o padrão de mercado é o cAdvisor (Container Advisor) do Google.
+
+Ele é um "agente" que roda como um container, lê as estatísticas do Docker e as expõe em um formato que o seu Prometheus já sabe ler.)
+
+docker run -d --name cadvisor -p 8080:8080 `  -v /:/rootfs:ro`
+-v /var/run:/var/run:ro `  -v /sys:/sys:ro`
+-v /var/lib/docker/:/var/lib/docker:ro `  --privileged`
+--device /dev/kmsg `
+gcr.io/cadvisor/cadvisor:latest
+
 ---
 
-GRAFANA
+GRAFANA Configurações:
 
 1 - Configure a Fonte de Dados no Grafana:
 1.1 - Acesse http://localhost:3000 (user/pass: admin/admin).
@@ -40,7 +53,7 @@ Para o Grafana entender que aquele texto do TraceId é um link para o Tempo, fa�
 3.4 Internal Link: Ative e selecione o Data Source Tempo.
 4 Clique em Save & Test
 
-3 - Bora montar o seu Dashboard de Visão 360°! O objetivo é ter as métricas no topo e os logs logo abaixo, tudo filtrado pelo mesmo intervalo de tempo.
+3 - Montar o Dashboard de Visão 360°! O objetivo é ter as métricas no topo e os logs logo abaixo, tudo filtrado pelo mesmo intervalo de tempo.
 
 3.1. Criar o Dashboard e o Gráfico de Métricas (Prometheus)
 No Grafana, vá em Dashboards -> New -> New Dashboard.
@@ -69,14 +82,40 @@ Title: Logs em Tempo Real
 Visualization: Procure por Logs (em vez de Time Series).
 Clique em Apply.
 
-3.3. Organizar e Salvar
+3.3 cAdvisor CPU
+Clique em + Add Visualization.
+Selecione o data source Prometheus.
+No campo Query (PromQL), cole:
+promql
+sum(rate(container_cpu_usage_seconds_total{name!=""}[1m])) by (name)
+
+No painel lateral direito:
+Title: Query para CPU
+Clique em Apply.
+
+3.4 cAdvisor Memoria
+Clique em + Add Visualization.
+Selecione o data source Prometheus.
+No campo Query (PromQL), cole:
+promql
+sum(container_memory_usage_bytes{name!=""}) by (name)
+
+No painel lateral direito:
+1 Title: Query para Memória
+2 Unidade de Medida - Como o container_memory_usage_bytes retorna o valor em Bytes, o gráfico vai mostrar números enormes (ex: 150.000.000).
+2.1 No painel lateral direito do Grafana, procure por Standard options -> Unit.
+2.2 Selecione Data (Metric) -> bytes (IEC).
+2.3 O Grafana converterá automaticamente para MB ou GB, facilitando a leitura.
+Clique em Apply.
+
+3.5. Organizar e Salvar
 Arraste o painel de Logs para ficar abaixo do gráfico de métricas.
 Redimensione os painéis para ocuparem toda a largura da tela.
 Clique no ícone de Disco Rígido (Save dashboard) no topo e dê o nome: Observabilidade .NET 10.
 
 ---
 
-LOKI
+LOKI Dicas:
 
 - Verificar se o Loki recebeu "Labels":
 
@@ -96,7 +135,7 @@ Se retornar vazio: Os logs não saíram da API.
 
 ---
 
-TEMPO
+TEMPO Dicas:
 
 Cole o ID no final desta URL no seu navegador para testar se o tempo recebeu:
 
@@ -112,3 +151,13 @@ Comandos importantes do Docker:
   docker stop prometheus
 - Apagar um container:
   docker rm -f prometheus
+
+---
+
+Conclusão do Lab 🎓
+Você agora domina:
+
+1. Instrumentação: .NET 10, Serilog, OpenTelemetry.
+2. Bancos de Dados: Prometheus (Métricas), Loki (Logs), Tempo (Traces).
+3. Infraestrutura: cAdvisor para monitorar containers.
+4. Visualização: Grafana com queries PromQL e LogQL avançadas (usando agregações).
