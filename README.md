@@ -62,7 +62,6 @@ Selecione o data source Prometheus.
 No campo Query (PromQL), cole:
 promql
 rate(http_requests_received_total{application="my-api-dotnet"}[1m])
-Use o código com cuidado.
 
 No painel lateral direito (Panel options):
 Title: Requisições por Segundo (RPS)
@@ -75,7 +74,6 @@ Selecione o data source Loki.
 No campo Query (LogQL), cole:
 logql
 {application="my-api-dotnet"} |= ``
-Use o código com cuidado.
 
 No painel lateral direito:
 Title: Logs em Tempo Real

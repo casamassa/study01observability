@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: "Meus Dashboards"
+    orgId: 1
+    folder: "Observability"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards # Pasta dentro do container
