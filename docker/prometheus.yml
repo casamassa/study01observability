@@ -7,3 +7,7 @@ scrape_configs:
       - targets: ["host.docker.internal:5000"] # Endereço da sua API
         labels:
           application: "my-api-dotnet"
+
+  - job_name: "cadvisor" # Configurar o Prometheus para ler o cAdvisor
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
