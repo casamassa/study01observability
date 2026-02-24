@@ -51,6 +51,17 @@ app.MapGet("/", (ILogger<Program> logger) =>
     return "Logs gerados!";
 });
 
+app.MapGet("/lento", async () =>
+{
+    var tempoEspera = Random.Shared.Next(500, 3000);
+    Log.Information("Iniciando processamento lento de {Tempo}ms", tempoEspera);
+
+    await Task.Delay(tempoEspera); // Simula uma demora (banco de dados ou API externa)
+
+    Log.Information("Processamento lento finalizado.");
+    return $"Demorei {tempoEspera}ms";
+});
+
 // Expõe o endpoint /metrics para o Prometheus ler (scrape)
 app.MapMetrics();
 
