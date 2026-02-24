@@ -4,9 +4,12 @@ using Serilog.Sinks.Grafana.Loki;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog.Enrichers.Span;
+using System.Diagnostics;
 
 // Nome do serviço que aparecerá no Grafana
 var serviceName = "my-api-dotnet";
+
+var activitySource = new ActivitySource("MinhaApi.Negocio");
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +31,7 @@ builder.Host.UseSerilog(); // Substitui o logging padrão pelo Serilog
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing => tracing
         .AddSource(serviceName)
+        .AddSource("MinhaApi.Negocio")
         .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName))
         .AddAspNetCoreInstrumentation(options =>
         {
@@ -60,6 +64,28 @@ app.MapGet("/lento", async () =>
 
     Log.Information("Processamento lento finalizado.");
     return $"Demorei {tempoEspera}ms";
+});
+
+app.MapGet("/clientes-assiduos", async () =>
+{
+    // Span Pai (Automático pelo AspNetCoreInstrumentation)
+    // Criamos um Sub-Span Manual para a lógica de Cache
+    using (var activityCache = activitySource.StartActivity("Consulta Redis"))
+    {
+        Log.Information("Buscando no cache...");
+        await Task.Delay(100); // Simula 100ms de Redis
+        activityCache?.SetTag("cache.hit", false); // Adiciona metadados ao rastro
+    }
+
+    // Criamos outro Sub-Span para a lógica de Banco de Dados
+    using (var activityDb = activitySource.StartActivity("Consulta MongoDB"))
+    {
+        Log.Information("Buscando no MongoDB...");
+        await Task.Delay(500); // Simula 500ms de Mongo
+        activityDb?.SetTag("db.query", "db.customers.find()");
+    }
+
+    return new { Status = "Sucesso", TempoTotal = "600ms" };
 });
 
 // Expõe o endpoint /metrics para o Prometheus ler (scrape)
