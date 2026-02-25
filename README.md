@@ -15,14 +15,14 @@ O objetivo principal é correlacionar os três pilares da observabilidade (Métr
 - **Visualização:** Grafana (Dashboards unificados e correlação de dados)
 - **Instrumentação:** OpenTelemetry SDK & Serilog
 
-## 🏗️ Arquitetura do Lab
+## 🏗️ Arquitetura do Lab (Desacoplada)
 
-A solução foi desenhada para ser 100% reproduzível via Docker. O fluxo de dados segue o padrão moderno de telemetria:
+A solução utiliza o OTel Collector como um hub central de telemetria. Em vez de a API se comunicar com múltiplos destinos, ela envia todos os dados (Metrics, Logs e Traces) via protocolo OTLP (gRPC) para o Collector, que se encarrega de processar e distribuir os dados:
 
-- **Traces:** Cada requisição recebe um TraceID único via OpenTelemetry.
-- **Logs:** O Serilog enriquece cada linha de log com o TraceID e envia para o Loki.
-- **Métricas:** O Prometheus realiza scraping dos endpoints de métricas da API e do cAdvisor.
-- **Correlação:** No Grafana, configuramos Derived Fields para que, ao clicar em um log, o rastro completo (Gantt Chart) seja aberto no Tempo instantaneamente.
+- **Unificação:** A API utiliza um único canal de saída (Porta 4317), reduzindo o overhead de rede e acoplamento.
+- **Processamento em Pipeline:** O Collector utiliza processadores (batch, resource, attributes) para normalizar labels como application e service.name antes de persistir os dados.
+- **Logs & Traces:** Correlacionados via TraceID injetado pelo Serilog e OpenTelemetry, permitindo o salto imediato do log para o gráfico de Gantt.
+- **Métricas:** Convertidas e expostas pelo Collector para o scraping do Prometheus, utilizando convenções semânticas modernas do OTel.
 
 ## 🚀 Como Executar
 
@@ -91,55 +91,11 @@ Este laboratório permitiu o domínio de:
 
 ## 🧭 Próximos Passos (Roadmap)
 
-### - Implementar OpenTelemetry **(OTel) Collector** e por que?
+O objetivo futuro é estender este laboratório para cenários de alta complexidade em microserviços:
 
-#### O Cenário Atual (Arquitetura "Acoplada")
-
-Hoje, a API .NET é "onipresente". Ela conhece todo mundo:
-
-- Ela sabe o IP do Prometheus.
-- Ela sabe a URL do Loki.
-- Ela sabe a porta gRPC do Tempo.
-
-**O problema:** Se precisar mudar do Loki para o Elasticsearch, ou do Tempo para o Jaeger, precisaria recompilar e fazer deploy da API só para mudar o destino dos dados. Em um ambiente com 20 microserviços, isso é um pesadelo de manutenção.
-
-#### O Cenário com OTel Collector (Arquitetura "Desacoplada")
-
-O Collector entra como um Middleware de Telemetria (um "Proxy").
-
-**1. Envio Único:** API não envia mais dados para três lugares. Ela envia tudo (Logs, Metrics e Traces) em um único "pacote" via protocolo OTLP para o Collector.
-
-**2. Configuração Centralizada:** O Collector recebe esse pacotão e, através de um arquivo YAML próprio, ele decide:
-
-1. _"Métricas? Vou mandar para o Prometheus."_
-2. _"Logs? Vou mandar para o Loki."_
-3. _"Traces? Vou mandar para o Tempo."_
-
-#### As 3 Grandes Vantagens (Por que usar?)
-
-**1. Agnosticismo de Backend (O "Pulo do Gato")**
-
-Amanhã, por exemplo, decide-se usar Datadog ou New Relic.
-
-- **Sem Collector:** Altera o código de todas as APIs.
-- **Com Collector:** Altera apenas adicionando uma linha no YAML do Collector dizendo: _"Além do Loki, mande também para o Datadog"_. A API nem fica sabendo.
-
-**2. Processamento e Limpeza (O Filtro)**
-
-O Collector pode "limpar" os dados antes de salvar.
-
-- Exemplo: Pode dizer para o Collector remover CPFs ou senhas que apareçam nos logs por acidente antes de gravá-los no Loki, garantindo conformidade com a LGPD de forma centralizada.
-
-**3. Performance (Batching)**
-
-Em vez de cada instância da API abrir conexões constantes com os bancos, o Collector agrupa os dados de todas as APIs e faz envios em lotes (batches) eficientes, reduzindo o overhead de rede da aplicação principal.
-
-#### Como ficaria o seu docker-compose.yml?
-
-Adicionaria um serviço chamado otel-collector.
-
-- Sua API enviaria tudo para o Collector na porta 4317.
-- O Collector teria "braços" (Exporters) esticados para o Prometheus, Loki e Tempo.
+- **Distributed Tracing (API A -> API B):** Implementar a propagação de contexto via headers W3C para rastrear uma transação que atravessa múltiplos serviços.
+- **Async Tracing (RabbitMQ):** Testar a persistência do TraceContext em arquiteturas orientadas a eventos, garantindo a visibilidade desde a postagem na fila até o processamento no Worker.
+- **Custom Metrics:** Adicionar instrumentação de negócio (ex: contagem de vendas, tempo de processamento de checkout) para dashboards executivos.
 
 ---
 
@@ -175,7 +131,20 @@ docker run -d --name tempo -p 3200:3200 -p 4317:4317 -v "${pwd}/docker/tempo-con
 docker run -d --name grafana -p 3000:3000 grafana/grafana:12.3.2
 ```
 
-### 5- **cAdvisor:**
+### 5- Otel-Collector
+
+```
+docker run -d \
+  --name otel-collector \
+  --network observability \
+  -v $(pwd)/docker/otel-collector-config.yaml:/etc/otel-collector-config.yaml \
+  -p 4317:4317 \
+  -p 8889:8889 \
+  otel/opentelemetry-collector-contrib:0.111.0 \
+  --config=/etc/otel-collector-config.yaml
+```
+
+### 6- **cAdvisor:**
 
 _Para monitorar o "hardware" dos containers (CPU, Memória, Rede) e integrar isso ao dashboard de métricas, o padrão de mercado é o cAdvisor (Container Advisor) do Google.
 Ele é um "agente" que roda como um container, lê as estatísticas do Docker e as expõe em um formato que o seu Prometheus já sabe ler._
@@ -224,7 +193,7 @@ Criar o Gráfico de Métricas (Prometheus):
 3. No campo Query (PromQL), cole:
 
 ```promql
-rate(http_requests_received_total{application="my-api-dotnet"}[1m])
+rate(http_server_request_duration_seconds_count{application="my-api-dotnet"}[1m])
 ```
 
 4. No painel lateral direito (Panel options):
@@ -281,6 +250,17 @@ sum(container_memory_usage_bytes{name!=""}) by (name)
 1. Arraste o painel de Logs para ficar abaixo do gráfico de métricas.
 2. Redimensione os painéis para ocuparem toda a largura da tela.
 3. Clique no ícone de Disco Rígido (Save dashboard) no topo e dê o nome: Observabilidade .NET 10.
+
+## OTEL-COLLECTOR Dicas Depuração:
+
+URL: http://localhost:8889/metrics
+
+Apresenta as métricas, dá pra pesquisar no texto se tal métrica está sendo gerada, por ex:
+
+Busque por:
+
+- http_server_request_duration_seconds_count ou
+- http_server_request_duration_seconds_count{application="my-api-dotnet"}[1m]
 
 ## LOKI Dicas Depuração:
 
