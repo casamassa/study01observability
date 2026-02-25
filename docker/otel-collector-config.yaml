@@ -1,0 +1,52 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+
+  # Força a label 'application' em TUDO (Metrics, Logs e Traces)
+  resource:
+    attributes:
+      - key: application
+        value: "my-api-dotnet"
+        action: upsert
+
+  # Mantém o mapeamento que funcionou para o Loki
+  attributes/loki:
+    actions:
+      - action: insert
+        key: loki.resource.labels
+        value: application
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    # IMPORTANTE: Converte o Resource acima em Label de métrica
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+
+  otlp/tempo:
+    endpoint: "tempo:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch, resource] # Injeta a label aqui
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource, attributes/loki] # Injeta e mapeia para o Loki
+      exporters: [loki]
+    traces:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [otlp/tempo]

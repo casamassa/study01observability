@@ -5,6 +5,9 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog.Enrichers.Span;
 using System.Diagnostics;
+using OpenTelemetry.Exporter;
+using Serilog.Sinks.OpenTelemetry;
+using OpenTelemetry.Metrics;
 
 // Nome do serviço que aparecerá no Grafana
 var serviceName = "my-api-dotnet";
@@ -21,8 +24,16 @@ Log.Logger = new LoggerConfiguration()
         logEvent.Properties.ContainsKey("RequestPath") &&
         logEvent.Properties["RequestPath"].ToString().Contains("/metrics")) // Ignora o Prometheus
     .WriteTo.Console()
-    .WriteTo.GrafanaLoki("http://localhost:3100",
-        new[] { new LokiLabel { Key = "application", Value = "my-api-dotnet" } })
+    .WriteTo.OpenTelemetry(options =>
+        {
+            options.Endpoint = "http://localhost:4317";
+            options.Protocol = OtlpProtocol.Grpc;
+            options.ResourceAttributes = new Dictionary<string, object>
+            {
+                ["service.name"] = "my-api-dotnet",
+                ["application"] = "my-api-dotnet"
+            };
+        })
     .CreateLogger();
 
 
@@ -41,8 +52,18 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation() // Rastreia chamadas externas (se você fizer)
         .AddOtlpExporter(opt =>
         {
-            opt.Endpoint = new Uri("http://localhost:4317"); // Endereço do nosso container Tempo
+            opt.Endpoint = new Uri("http://localhost:4317");
+            opt.Protocol = OtlpExportProtocol.Grpc;
+        }))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation() // Captura o http_requests_received_total
+        .AddRuntimeInstrumentation()   // Captura GC, CPU, etc.
+        .AddOtlpExporter(opt =>
+        {
+            opt.Endpoint = new Uri("http://localhost:4317");
+            opt.Protocol = OtlpExportProtocol.Grpc;
         }));
+
 
 var app = builder.Build();
 
