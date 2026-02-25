@@ -154,13 +154,13 @@ Subir os containers:
 ### 1- **Prometheus:**
 
 ```
-docker run -d --name prometheus -p 9090:9090 -v "${pwd}/docker/prometheus.yml:/etc/prometheus/prometheus.yml" prom/prometheus
+docker run -d --name prometheus -p 9090:9090 -v "${pwd}/docker/prometheus.yml:/etc/prometheus/prometheus.yml" prom/prometheus:v3.9.1
 ```
 
 ### 2- **Loki:**
 
 ```
-docker run -d --name loki -p 3100:3100 grafana/loki
+docker run -d --name loki -p 3100:3100 grafana/loki:2.9.4
 ```
 
 ### 3- **Tempo:**
@@ -172,7 +172,7 @@ docker run -d --name tempo -p 3200:3200 -p 4317:4317 -v "${pwd}/docker/tempo-con
 ### 4- **Grafana:**
 
 ```
-docker run -d --name grafana -p 3000:3000 grafana/grafana
+docker run -d --name grafana -p 3000:3000 grafana/grafana:12.3.2
 ```
 
 ### 5- **cAdvisor:**
@@ -185,7 +185,7 @@ docker run -d --name cadvisor -p 8080:8080 `  -v /:/rootfs:ro`
 -v /var/run:/var/run:ro `  -v /sys:/sys:ro`
 -v /var/lib/docker/:/var/lib/docker:ro `  --privileged`
 --device /dev/kmsg `
-gcr.io/cadvisor/cadvisor:latest
+gcr.io/cadvisor/cadvisor:v0.55.1
 ```
 
 ## GRAFANA Configurações manuais:

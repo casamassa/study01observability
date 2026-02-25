@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.9.1
     container_name: prometheus
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -10,7 +10,7 @@ services:
       - observability
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.4
     container_name: loki
     ports:
       - "3100:3100"
@@ -31,7 +31,7 @@ services:
       - observability
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.3.2
     container_name: grafana
     ports:
       - "3000:3000"
@@ -45,7 +45,7 @@ services:
       - observability
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     ports:
       - "8080:8080"
