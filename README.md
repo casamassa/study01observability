@@ -71,7 +71,15 @@ docker compose down -v
 - **Navegação Log-to-Trace:** No painel de logs, clique no TraceID destacado em azul para ver a decomposição do tempo de execução (Sub-spans de Redis/MongoDB) no Grafana Tempo.
 - **Infra Monitoring:** Gráficos de saúde do Docker alimentados pelo cAdvisor, integrados na mesma visão da aplicação.
 
+### Screenshots
+
+#### Dashboard 360
+
 ![Dashboard 360](screenshots/dash-360.jpg)
+
+#### Gráfico de Gantt - Metrics - Tempo
+
+![Gráfico de Gantt](screenshots/tempo-graph-gantt.jpg)
 
 ## 🧠 Aprendizados e Evolução
 
